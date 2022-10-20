@@ -20,6 +20,8 @@
 #define __USE_BSD
 #define __FAVOR_BSD
 #endif
+#define _DEFAULT_SOURCE
+#include <config.h>
 #include <libintl.h>
 #include <locale.h>
 #include <stdio.h>
@@ -29,17 +31,17 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(HAVE_NETINET_IN_H)
 #include <netinet/in.h>
 #endif
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#include <net/ethernet.h>
-#define ETH_FRAME_LEN (ETHER_MAX_LEN - ETHER_CRC_LEN)
-#define ETH_ALEN ETHER_ADDR_LEN
+#if defined(HAVE_NETINET_ETHER_H)
+# include <netinet/ether.h>
 #else
-#include <netinet/ether.h>
+ #include <net/ethernet.h>
+ #define ETH_FRAME_LEN (ETHER_MAX_LEN - ETHER_CRC_LEN)
+ #define ETH_ALEN ETHER_ADDR_LEN
 #endif
 #include <arpa/inet.h>
 #include <net/if.h>
@@ -315,7 +317,7 @@ int net_send_udp(const int fd, struct net_interface *interface, const unsigned c
 	*/
 	static unsigned char stackbuf[ETH_FRAME_LEN];
 	void* buffer = (void*)&stackbuf;
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined WITH_STRUCT_IP
 	struct ether_header *eh = (struct ether_header *)buffer;
 	struct ip *ip = (struct ip *)(buffer + 14);
 #else
@@ -341,18 +343,19 @@ int net_send_udp(const int fd, struct net_interface *interface, const unsigned c
 		exit(1);
 	}
 
-	/* Init ethernet header */
-#if defined(__FreeBSD__) || defined(__APPLE__)
-	memcpy(eh->ether_shost, sourcemac, ETH_ALEN);
-	memcpy(eh->ether_dhost, destmac, ETH_ALEN);
-	eh->ether_type = htons(ETHERTYPE_IP);
-#else
+
+#if defined(WITH_STRUCT_ETHER_HEADER_H_SOURCE)
+/* Init ethernet header */
 	memcpy(eh->h_source, sourcemac, ETH_ALEN);
 	memcpy(eh->h_dest, destmac, ETH_ALEN);
 	eh->h_proto = htons(ETH_P_IP);
+#else
+	memcpy(eh->ether_shost, sourcemac, ETH_ALEN);
+	memcpy(eh->ether_dhost, destmac, ETH_ALEN);
+	eh->ether_type = htons(ETHERTYPE_IP);
 #endif
 
-#ifdef __linux__
+#if defined(HAVE_NETINET_ETHER_H)
 	/* Init SendTo struct */
 	socket_address.sll_family   = AF_PACKET;
 	socket_address.sll_protocol = htons(ETH_P_IP);
@@ -360,14 +363,15 @@ int net_send_udp(const int fd, struct net_interface *interface, const unsigned c
 	socket_address.sll_hatype   = ARPHRD_ETHER;
 	socket_address.sll_pkttype  = PACKET_OTHERHOST;
 	socket_address.sll_halen    = ETH_ALEN;
-
+#if defined(WITH_STRUCT_ETHER_HEADER_H_SOURCE)
 	memcpy(socket_address.sll_addr, eh->h_source, ETH_ALEN);
+#endif
 	socket_address.sll_addr[6]  = 0x00;/*not used*/
 	socket_address.sll_addr[7]  = 0x00;/*not used*/
 #endif
 
-	/* Init IP Header */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+/* Init IP Header */
+#if defined(WITH_STRUCT_IP_IP_SRC)
 	ip->ip_v = 4;
 	ip->ip_hl = 5;
 	ip->ip_tos = 0x10;
@@ -394,14 +398,14 @@ int net_send_udp(const int fd, struct net_interface *interface, const unsigned c
 #endif
 
 	/* Calculate checksum for IP header */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(WITH_STRUCT_IP_IP_SUM)
 	ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
 #else
 	ip->check = in_cksum((unsigned short *)ip, sizeof(struct iphdr));
 #endif
 
 	/* Init UDP Header */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(WITH_STRUCT_UDPHDR_UH_SPORT)
 	udp->uh_sport = htons(sourceport);
 	udp->uh_dport = htons(destport);
 	udp->uh_ulen = htons(sizeof(struct udphdr) + datalen);
@@ -415,19 +419,24 @@ int net_send_udp(const int fd, struct net_interface *interface, const unsigned c
 
 	/* Insert actual data */
 	memcpy(rest, data, datalen);
-
 	/* Add UDP checksum */
-#if defined(__FreeBSD__) || defined(__APPLE__)
-	udp->uh_sum = udp_sum_calc((unsigned char *)&(ip->ip_src.s_addr),
+#if defined(WITH_STRUCT_UDPHDR_UH_SUM)
+	udp->uh_sum =
+#else
+	udp->check =
+#endif
+#if defined(WITH_STRUCT_IP_IP_SRC)
+	udp_sum_calc((unsigned char *)&(ip->ip_src.s_addr),
 	  (unsigned char *)&(ip->ip_dst.s_addr),
+#else
+	udp_sum_calc((unsigned char *)&(ip->saddr),
+	  (unsigned char *)&(ip->daddr),
+#endif
 	  (unsigned char *)udp,
 	  sizeof(struct udphdr) + datalen);
+#if defined (WITH_STRUCT_UDPHDR_UH_SUM)
 	udp->uh_sum = htons(udp->uh_sum);
 #else
-	udp->check = udp_sum_calc((unsigned char *)&(ip->saddr),
-	  (unsigned char *)&(ip->daddr),
-	  (unsigned char *)udp,
-	  sizeof(struct udphdr) + datalen);
 	udp->check = htons(udp->check);
 #endif
 

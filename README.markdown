@@ -33,10 +33,10 @@ See [Usage](#usage) for more.
 To install dependencies:
 
     yum -y install wget automake gettext gettext-devel gcc make
-       
-    
+
+
 Download source tarball, extract, compile and install:
-    
+
     wget http://github.com/haakonnessjoen/MAC-Telnet/tarball/master -O mactelnet.tar.gz
     tar zxvf mactelnet.tar.gz
     cd haakonness*/
@@ -88,19 +88,12 @@ Install dependencies, download source tarball, extract, compile and install:
     cd haakonness*/
 
     # Install dependencies
-    brew install gettext autoconf automake libtool openssl
+    brew install meson gettext openssl
 
-    export GETTEXT_PATH=$(brew --prefix gettext)
-    export OPENSSL_PATH=$(brew --prefix openssl)
-
-    export PATH="${GETTEXT_PATH}/bin:${OPENSSL_PATH}/bin:$PATH"
-    export LDFLAGS="-L${GETTEXT_PATH}/lib"
-    export CPPFLAGS="-I${GETTEXT_PATH}/include -I${OPENSSL_PATH}/include"
-    export CRYPTO_CFLAGS="-I${OPENSSL_PATH}/include"
-    export CRYPTO_LIBS="-L${OPENSSL_PATH}/lib ${OPENSSL_PATH}/lib/libcrypto.3.dylib"
-    ./autogen.sh
-    make all install
-
+    # Configure
+    meson setup builddir --reconfigure -Dopenssldir=`brew --prefix openssl` && cd builddir
+    meson compile
+    meson install
 
 Usage
 -----

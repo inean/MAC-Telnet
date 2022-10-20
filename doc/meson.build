@@ -1,0 +1,1 @@
+install_man(['mactelnet.1', 'mactelnetd.1', 'mndp.1', 'macping.1'])

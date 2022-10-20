@@ -1,20 +1,21 @@
-FROM alpine:3.16 AS builder
+FROM alpine:latest AS builder
 
 # Install build dependencies
-RUN apk add --no-cache diffutils build-base automake autoconf git gettext gettext-dev linux-headers openssl-dev
+RUN apk add --no-cache diffutils build-base git gettext gettext-dev linux-headers openssl-dev meson
 
 # Copy everything to /src
 RUN mkdir /src
 WORKDIR /src
 ADD . /src/
+RUN rm -rf builddir
 
 # Build
-ENV CFLAGS="-D_GNU_SOURCE"
-RUN ./autogen.sh --prefix=/build
-RUN make all install
-
-## 
-FROM alpine:3.16
+RUN meson builddir
+RUN meson compile -C builddir
+ENV DESTDIR=/build
+RUN meson install -C builddir
+##
+FROM alpine:latest
 
 # Install runtime dependencies
 RUN apk add --no-cache gettext-libs openssl-dev
