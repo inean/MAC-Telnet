@@ -16,13 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.x'
-    - run: pip install meson ninja
+    - run:  apt-get install build-essential gettext libssl-dev meson
     - run: meson setup builddir/
-      env:
-        CC: gcc
     - run: meson test -C builddir/ -v
     - uses: actions/upload-artifact@v1
       if: failure()
@@ -34,14 +29,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.x'
-    - run: brew install gcc
-    - run: pip install meson ninja
+    - run: brew install meson gettext openssl
     - run: meson setup builddir/
-      env:
-        CC: gcc
     - run: meson test -C builddir/ -v
     - uses: actions/upload-artifact@v1
       if: failure()
@@ -53,13 +42,8 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.x'
-    - run: pip install meson ninja
+    - run: choco install meson
     - run: meson setup builddir/
-      env:
-        CC: gcc
     - run: meson test -C builddir/ -v
     - uses: actions/upload-artifact@v1
       if: failure()
